@@ -20,6 +20,10 @@ const uploadCsv = multer({
 
 const PORT = process.env.PORT || 3000;
 
+app.get('/', (req, res) => {
+  res.redirect(302, '/ctv-compare.html');
+});
+
 /**
  * POST /process
  * Body: { "platform": "ctv" | "mobile" | "website" | "all" }
