@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Upload &amp; compare adlines</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        background-color: #fff;
+        font-family: 'Albert Sans', system-ui, -apple-system, sans-serif;
+        font-weight: 500;
+      }
+      body {
+        margin: 0;
+        font-family: inherit;
+        font-weight: 500;
+        background-color: #fff;
+        color: #1a1a1a;
+        line-height: 1.45;
+        padding: 1.5rem 1.25rem 3rem;
+      }
+      h1 {
+        font-size: 1.35rem;
+        font-weight: 500;
+        margin: 0 0 0.35rem;
+      }
+      strong {
+        font-weight: 500;
+      }
+      code {
+        font-family: 'Albert Sans', sans-serif;
+        font-weight: 500;
+      }
+      .sub {
+        font-size: 0.9rem;
+        color: #444;
+        margin-bottom: 1.25rem;
+        max-width: 52rem;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      label.sr-flow {
+        font-size: 0.9rem;
+        color: #444;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      select#source {
+        font-size: 0.9rem;
+        font-family: inherit;
+        font-weight: 500;
+        padding: 0.4rem 0.65rem;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        background: #fff;
+        min-width: 10rem;
+      }
+      .file-wrap {
+        display: inline-flex;
+        align-items: center;
+      }
+      .file-wrap[hidden] {
+        display: none !important;
+      }
+      input[type='file'] {
+        font-size: 0.9rem;
+        font-family: inherit;
+        font-weight: 500;
+      }
+      button {
+        font-size: 0.9rem;
+        font-family: inherit;
+        font-weight: 500;
+        padding: 0.45rem 1rem;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        background: #f5f5f5;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) {
+        background: #eee;
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      button.primary {
+        background: #1a1a1a;
+        color: #fff;
+        border-color: #1a1a1a;
+      }
+      button.primary:hover:not(:disabled) {
+        background: #333;
+      }
+      .err {
+        color: #b00020;
+        font-size: 0.9rem;
+        margin: 0.5rem 0;
+        max-width: 52rem;
+      }
+      .loading {
+        font-size: 0.9rem;
+        color: #555;
+      }
+      .legend {
+        display: flex;
+        gap: 1.25rem;
+        font-size: 0.8rem;
+        margin: 0.75rem 0 0.5rem;
+      }
+      .swatch {
+        display: inline-block;
+        width: 1rem;
+        height: 0.75rem;
+        vertical-align: middle;
+        margin-right: 0.35rem;
+        border: 1px solid #bbb;
+      }
+      .wrap {
+        overflow-x: auto;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        max-width: 100%;
+        background-color: #fff;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        transform: translateZ(0);
+        isolation: isolate;
+      }
+      table {
+        font-family: inherit;
+        font-weight: 500;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.72rem;
+        min-width: max-content;
+        width: 100%;
+        background-color: #fff;
+      }
+      th,
+      td {
+        border-right: 1px solid #e0e0e0;
+        border-bottom: 1px solid #e0e0e0;
+        padding: 0.35rem 0.5rem;
+        text-align: left;
+        vertical-align: top;
+        max-width: 14rem;
+        word-break: break-word;
+      }
+      th:last-child,
+      td:last-child {
+        border-right: none;
+      }
+      thead tr:first-child th {
+        border-top: 1px solid #e0e0e0;
+      }
+      thead th {
+        background-color: #f8f8f8;
+        font-weight: 500;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background-clip: padding-box;
+        box-shadow: inset 0 -1px 0 #e0e0e0;
+      }
+      tbody td {
+        background-color: #fff;
+      }
+      td.cell-match {
+        background-color: #d4edda;
+      }
+      td.cell-mismatch {
+        background-color: #f8d7da;
+      }
+      .muted {
+        color: #666;
+        font-size: 0.68rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Compare uploaded CSV vs live app-ads.txt</h1>
+    <p class="sub">
+      Choose <strong>CTV</strong>, <strong>Mobile</strong>, or <strong>Website</strong>, then upload a CSV and run
+      compare. For <strong>CTV</strong>, the file should include <strong>App Bundle</strong>,
+      <strong>app-ads.txt URL</strong> (or <strong>app_ads_txt_url</strong>),
+      <strong>Inventory Partner Domain</strong>, and adline columns with <strong>YES / NO</strong> or
+      <strong>Found / Missing</strong>. Column order does not matter. Rows are matched by bundle; fetches use the same
+      URL priority as the pipeline (partner <code>.txt</code> link → partner host fallbacks → app-ads URL from the file).
+      <strong>CSV</strong> has no cell colors — use <strong>Download Excel (colors)</strong> for the same green/red
+      fills as the table (CTV).
+    </p>
+
+    <div class="row">
+      <label class="sr-flow" for="source">
+        Source
+        <select id="source" name="source" autocomplete="off">
+          <option value="" selected>Select</option>
+          <option value="ctv">CTV</option>
+          <option value="mobile">Mobile</option>
+          <option value="website">Website</option>
+        </select>
+      </label>
+      <span class="file-wrap" id="fileWrap" hidden>
+        <input type="file" id="file" accept=".csv,text/csv" disabled />
+      </span>
+      <button type="button" class="primary" id="run" disabled>Run compare</button>
+      <button type="button" id="download" disabled>Download CSV</button>
+      <button type="button" id="download-xlsx" disabled>Download Excel (colors)</button>
+    </div>
+    <p id="loading" class="loading" hidden>Running compare…</p>
+    <p id="error" class="err" hidden></p>
+
+    <div id="legend" class="legend" hidden>
+      <span><span class="swatch" style="background: #d4edda"></span>Match (Found/Missing agrees with fetch)</span>
+      <span><span class="swatch" style="background: #f8d7da"></span>Mismatch</span>
+    </div>
+    <div id="tableHost" class="wrap" hidden></div>
+
+    <script>
+      const sourceSelect = document.getElementById('source');
+      const fileWrap = document.getElementById('fileWrap');
+      const fileInput = document.getElementById('file');
+      const runBtn = document.getElementById('run');
+      const downloadBtn = document.getElementById('download');
+      const downloadXlsxBtn = document.getElementById('download-xlsx');
+      const loadingEl = document.getElementById('loading');
+      const errorEl = document.getElementById('error');
+      const tableHost = document.getElementById('tableHost');
+      const legendEl = document.getElementById('legend');
+
+      let lastCsvExport = '';
+      let lastPayload = null;
+      let lastSource = '';
+
+      const COMPARE_URL = {
+        ctv: '/api/ctv-compare',
+        mobile: '/api/mobile-compare',
+        website: '/api/website-compare',
+      };
+
+      function selectedSource() {
+        return sourceSelect.value || '';
+      }
+
+      function syncControlsFromSource() {
+        const src = selectedSource();
+        const hasSource = Boolean(src);
+        fileWrap.hidden = !hasSource;
+        fileInput.disabled = !hasSource;
+        if (!hasSource) {
+          fileInput.value = '';
+        }
+        runBtn.disabled = !hasSource || !fileInput.files?.length;
+      }
+
+      sourceSelect.addEventListener('change', () => {
+        showError('');
+        lastCsvExport = '';
+        lastPayload = null;
+        lastSource = '';
+        downloadBtn.disabled = true;
+        downloadXlsxBtn.disabled = true;
+        tableHost.hidden = true;
+        legendEl.hidden = true;
+        tableHost.innerHTML = '';
+        syncControlsFromSource();
+      });
+
+      fileInput.addEventListener('change', () => {
+        runBtn.disabled = !selectedSource() || !fileInput.files?.length;
+      });
+
+      syncControlsFromSource();
+
+      function showError(msg) {
+        errorEl.textContent = msg || '';
+        errorEl.hidden = !msg;
+      }
+
+      function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+      }
+
+      function renderTable(payload) {
+        const rows = payload.rows || [];
+        if (!rows.length) {
+          tableHost.innerHTML = '<p class="muted">No rows with an App Bundle.</p>';
+          tableHost.hidden = false;
+          return;
+        }
+
+        const adlineMeta = rows[0].adlines || [];
+        const thead = document.createElement('thead');
+        const trh = document.createElement('tr');
+        const baseHeaders = [
+          'App Bundle',
+          'app_ads_txt_url (anshul)',
+          'app_ads_txt_url (abhinav)',
+          'inventory_partner_domain (anshul)',
+        ];
+        baseHeaders.forEach((h) => {
+          const th = document.createElement('th');
+          th.textContent = h;
+          trh.appendChild(th);
+        });
+        for (const a of adlineMeta) {
+          const th1 = document.createElement('th');
+          th1.innerHTML = esc(a.adline) + '<br /><span class="muted">(anshul)</span>';
+          trh.appendChild(th1);
+          const th2 = document.createElement('th');
+          th2.innerHTML = esc(a.adline) + '<br /><span class="muted">(abhinav)</span>';
+          trh.appendChild(th2);
+        }
+        thead.appendChild(trh);
+
+        const tbody = document.createElement('tbody');
+        const bodyFrag = document.createDocumentFragment();
+        for (const r of rows) {
+          const tr = document.createElement('tr');
+          const fixed = [
+            r.appBundle,
+            r.appAdsTxtUrlAnshul,
+            r.appAdsTxtUrlAbhinav,
+            r.inventoryPartnerAnshul,
+          ];
+          fixed.forEach((cell) => {
+            const td = document.createElement('td');
+            td.textContent = cell;
+            tr.appendChild(td);
+          });
+          for (const a of r.adlines) {
+            const td1 = document.createElement('td');
+            td1.textContent = a.anshulLabel || a.anshulRaw || '';
+            td1.className = a.match ? 'cell-match' : 'cell-mismatch';
+            tr.appendChild(td1);
+            const td2 = document.createElement('td');
+            td2.textContent = a.abhinavLabel;
+            td2.className = a.match ? 'cell-match' : 'cell-mismatch';
+            tr.appendChild(td2);
+          }
+          bodyFrag.appendChild(tr);
+        }
+        tbody.appendChild(bodyFrag);
+
+        const table = document.createElement('table');
+        table.appendChild(thead);
+        table.appendChild(tbody);
+        tableHost.replaceChildren(table);
+        tableHost.hidden = false;
+        legendEl.hidden = false;
+      }
+
+      runBtn.addEventListener('click', async () => {
+        const src = selectedSource();
+        const f = fileInput.files?.[0];
+        if (!src || !f) return;
+        const url = COMPARE_URL[src];
+        if (!url) {
+          showError('Choose a source (CTV, Mobile, or Website).');
+          return;
+        }
+
+        showError('');
+        loadingEl.hidden = false;
+        fileInput.disabled = true;
+        runBtn.disabled = true;
+        downloadBtn.disabled = true;
+        downloadXlsxBtn.disabled = true;
+        tableHost.hidden = true;
+        legendEl.hidden = true;
+        lastCsvExport = '';
+        lastPayload = null;
+        lastSource = '';
+
+        const fd = new FormData();
+        fd.append('csv', f, f.name);
+
+        try {
+          const res = await fetch(url, { method: 'POST', body: fd });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) {
+            showError(data.error || res.statusText || 'Request failed');
+            return;
+          }
+          lastSource = src;
+          lastPayload = data;
+          lastCsvExport = data.csvExport || '';
+          if (src === 'ctv') {
+            renderTable(data);
+            downloadBtn.disabled = !lastCsvExport;
+            downloadXlsxBtn.disabled = !Array.isArray(data.rows) || data.rows.length === 0;
+          } else {
+            tableHost.hidden = true;
+            legendEl.hidden = true;
+            downloadBtn.disabled = !lastCsvExport;
+            downloadXlsxBtn.disabled = true;
+          }
+        } catch (e) {
+          showError(e.message || String(e));
+        } finally {
+          loadingEl.hidden = true;
+          const srcStill = selectedSource();
+          fileInput.disabled = !srcStill;
+          runBtn.disabled = !srcStill || !fileInput.files?.length;
+        }
+      });
+
+      function stampNow() {
+        const pad = (n) => String(n).padStart(2, '0');
+        const d = new Date();
+        return `${pad(d.getDate())}_${pad(d.getMonth() + 1)}_${d.getFullYear()}_${pad(d.getHours())}_${pad(d.getMinutes())}`;
+      }
+
+      downloadBtn.addEventListener('click', () => {
+        if (!lastCsvExport) return;
+        const blob = new Blob([lastCsvExport], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `ctv_compare_export_${stampNow()}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+
+      downloadXlsxBtn.addEventListener('click', async () => {
+        if (lastSource !== 'ctv' || !lastPayload?.rows?.length) return;
+        showError('');
+        downloadXlsxBtn.disabled = true;
+        try {
+          const res = await fetch('/api/ctv-export-xlsx', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: lastPayload.rows }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            showError(err.error || res.statusText || 'Excel export failed');
+            return;
+          }
+          const blob = await res.blob();
+          const cd = res.headers.get('Content-Disposition');
+          const m = cd && cd.match(/filename="([^"]+)"/);
+          const filename = m ? m[1] : `ctv_compare_${stampNow()}.xlsx`;
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(a.href);
+        } catch (e) {
+          showError(e.message || String(e));
+        } finally {
+          downloadXlsxBtn.disabled = !lastPayload?.rows?.length;
+        }
+      });
+    </script>
+  </body>
+</html>

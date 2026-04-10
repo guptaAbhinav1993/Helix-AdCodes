@@ -1,0 +1,22 @@
+{
+  "name": "helix-adscodes",
+  "version": "1.0.0",
+  "description": "Node app connected to MongoDB (xapads_usp)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "compare-csv": "node src/compareCli.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "csv-parse": "^6.2.1",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.0",
+    "mongodb": "^6.10.0",
+    "multer": "^2.1.1"
+  }
+}
