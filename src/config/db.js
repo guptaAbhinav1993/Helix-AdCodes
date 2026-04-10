@@ -1,12 +1,7 @@
 const { MongoClient } = require('mongodb');
 require('dotenv').config();
 
-const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = 'xapads_usp';
-
-if (!MONGODB_URI) {
-  throw new Error('Missing MONGODB_URI in environment. Add it to .env');
-}
 
 let client = null;
 let db = null;
@@ -16,8 +11,14 @@ let db = null;
  * Reuses the same connection on subsequent calls.
  */
 async function connect() {
+  const uri = process.env.MONGODB_URI && String(process.env.MONGODB_URI).trim();
+  if (!uri) {
+    throw new Error(
+      'Missing MONGODB_URI in environment. Add it to .env locally or to Vercel Project → Settings → Environment Variables.'
+    );
+  }
   if (db) return db;
-  client = new MongoClient(MONGODB_URI);
+  client = new MongoClient(uri);
   await client.connect();
   db = client.db(DB_NAME);
   return db;
