@@ -319,12 +319,12 @@ async function buildAndWriteCsv(approvedApps, enabledRecords, outputDir, platfor
 
     const row = isCtv
       ? [
-          app.app_name ?? '',
-          app.app_bundle ?? '',
-          app.app_ads_txt_url ?? '',
-          app.inventory_partner_domain ?? '',
-          displayUrl,
-        ]
+        app.app_name ?? '',
+        app.app_bundle ?? '',
+        app.app_ads_txt_url ?? '',
+        app.inventory_partner_domain ?? '',
+        displayUrl,
+      ]
       : [app.app_name ?? '', app.app_bundle ?? '', displayUrl];
     for (const adline of adlineList) {
       row.push(isAdlineInContent(adline, content) ? 'YES' : 'NO');

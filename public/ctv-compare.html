@@ -200,10 +200,16 @@
       compare. For <strong>CTV</strong>, the file should include <strong>App Bundle</strong>,
       <strong>app-ads.txt URL</strong> (or <strong>app_ads_txt_url</strong>),
       <strong>Inventory Partner Domain</strong>, and adline columns with <strong>YES / NO</strong> or
-      <strong>Found / Missing</strong>. Column order does not matter. Rows are matched by bundle; fetches use the same
-      URL priority as the pipeline (partner <code>.txt</code> link → partner host fallbacks → app-ads URL from the file).
-      <strong>CSV</strong> has no cell colors — use <strong>Download Excel (colors)</strong> for the same green/red
-      fills as the table (CTV).
+      <strong>Found / Missing</strong>. Fetches use pipeline priority (partner <code>.txt</code> link → partner host
+      fallbacks → app-ads URL from the file). For <strong>Mobile</strong>, use the same columns except fetches use
+      only the app-ads URL from the CSV (inventory partner is ignored). If that URL has no <code>.txt</code> path, the
+      app loads <code>/app-ads.txt</code> on the same origin. Column order does not matter.
+      For <strong>Website</strong>, include a <strong>Domain</strong> column (bare host or URL; <code>http</code> /
+      <code>https</code> / <code>www</code> optional). The tool fetches <code>ads.txt</code> using
+      <code>http://{domain}/ads.txt</code>, then <code>http://www.{domain}/ads.txt</code>, then HTTPS variants, in
+      that order. Adline matching uses the same rules as Mobile.
+      <strong>CSV</strong> has no cell colors — use <strong>Download Excel (colors)</strong> for green/red fills
+      (CTV, Mobile, and Website).
     </p>
 
     <div class="row">
@@ -299,10 +305,12 @@
         return d.innerHTML;
       }
 
-      function renderTable(payload) {
+      function renderTable(payload, source) {
         const rows = payload.rows || [];
         if (!rows.length) {
-          tableHost.innerHTML = '<p class="muted">No rows with an App Bundle.</p>';
+          const emptyMsg =
+            source === 'website' ? 'No rows with a Domain.' : 'No rows with an App Bundle.';
+          tableHost.innerHTML = `<p class="muted">${emptyMsg}</p>`;
           tableHost.hidden = false;
           return;
         }
@@ -310,12 +318,15 @@
         const adlineMeta = rows[0].adlines || [];
         const thead = document.createElement('thead');
         const trh = document.createElement('tr');
-        const baseHeaders = [
-          'App Bundle',
-          'app_ads_txt_url (anshul)',
-          'app_ads_txt_url (abhinav)',
-          'inventory_partner_domain (anshul)',
-        ];
+        const baseHeaders =
+          source === 'website'
+            ? ['Domain', 'domain (anshul)', 'ads.txt URL (abhinav)', 'error']
+            : [
+                'App Bundle',
+                'app_ads_txt_url (anshul)',
+                'app_ads_txt_url (abhinav)',
+                'inventory_partner_domain (anshul)',
+              ];
         baseHeaders.forEach((h) => {
           const th = document.createElement('th');
           th.textContent = h;
@@ -335,12 +346,15 @@
         const bodyFrag = document.createDocumentFragment();
         for (const r of rows) {
           const tr = document.createElement('tr');
-          const fixed = [
-            r.appBundle,
-            r.appAdsTxtUrlAnshul,
-            r.appAdsTxtUrlAbhinav,
-            r.inventoryPartnerAnshul,
-          ];
+          const fixed =
+            source === 'website'
+              ? [r.appBundle, r.appAdsTxtUrlAnshul, r.appAdsTxtUrlAbhinav, r.fetchError ?? '']
+              : [
+                  r.appBundle,
+                  r.appAdsTxtUrlAnshul,
+                  r.appAdsTxtUrlAbhinav,
+                  r.inventoryPartnerAnshul,
+                ];
           fixed.forEach((cell) => {
             const td = document.createElement('td');
             td.textContent = cell;
@@ -403,8 +417,8 @@
           lastSource = src;
           lastPayload = data;
           lastCsvExport = data.csvExport || '';
-          if (src === 'ctv') {
-            renderTable(data);
+          if (src === 'ctv' || src === 'mobile' || src === 'website') {
+            renderTable(data, src);
             downloadBtn.disabled = !lastCsvExport;
             downloadXlsxBtn.disabled = !Array.isArray(data.rows) || data.rows.length === 0;
           } else {
@@ -434,20 +448,36 @@
         const blob = new Blob([lastCsvExport], { type: 'text/csv;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `ctv_compare_export_${stampNow()}.csv`;
+        const csvPrefix =
+          lastSource === 'mobile'
+            ? 'mobile_compare_export'
+            : lastSource === 'website'
+              ? 'website_compare_export'
+              : 'ctv_compare_export';
+        a.download = `${csvPrefix}_${stampNow()}.csv`;
         a.click();
         URL.revokeObjectURL(a.href);
       });
 
       downloadXlsxBtn.addEventListener('click', async () => {
-        if (lastSource !== 'ctv' || !lastPayload?.rows?.length) return;
+        if (
+          (lastSource !== 'ctv' && lastSource !== 'mobile' && lastSource !== 'website') ||
+          !lastPayload?.rows?.length
+        )
+          return;
         showError('');
         downloadXlsxBtn.disabled = true;
         try {
+          const filenamePrefix =
+            lastSource === 'mobile'
+              ? 'mobile_compare'
+              : lastSource === 'website'
+                ? 'website_compare'
+                : 'ctv_compare';
           const res = await fetch('/api/ctv-export-xlsx', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rows: lastPayload.rows }),
+            body: JSON.stringify({ rows: lastPayload.rows, filenamePrefix }),
           });
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
@@ -457,7 +487,7 @@
           const blob = await res.blob();
           const cd = res.headers.get('Content-Disposition');
           const m = cd && cd.match(/filename="([^"]+)"/);
-          const filename = m ? m[1] : `ctv_compare_${stampNow()}.xlsx`;
+          const filename = m ? m[1] : `${filenamePrefix}_${stampNow()}.xlsx`;
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
           a.download = filename;

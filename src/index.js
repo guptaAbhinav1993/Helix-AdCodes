@@ -6,6 +6,8 @@ const { processPayload, VALID_PLATFORMS, INVENTORY_COLLECTIONS } = require('./pr
 const { runMatchFromOutputFiles } = require('./adlinesMatcher');
 const { runCsvCompare } = require('./csvCompare');
 const { runCtvUploadCompare } = require('./ctvUploadCompare');
+const { runMobileUploadCompare } = require('./mobileUploadCompare');
+const { runWebsiteUploadCompare } = require('./websiteUploadCompare');
 const { buildCtvCompareXlsxBuffer } = require('./ctvExportXlsx');
 const { filenameTimestamp } = require('./outputNames');
 
@@ -19,6 +21,8 @@ const uploadCsv = multer({
 });
 
 const PORT = process.env.PORT || 3000;
+/** Bind all IPv4 interfaces so the app is reachable via instance public IP / load balancer. */
+const HOST = process.env.HOST || '0.0.0.0';
 
 app.get('/', (req, res) => {
   res.redirect(302, '/ctv-compare.html');
@@ -169,41 +173,53 @@ app.post('/api/ctv-compare', uploadCsv.single('csv'), async (req, res) => {
 
 /**
  * POST /api/mobile-compare — multipart field "csv"
- * Placeholder until mobile compare pipeline is wired (same multipart contract as CTV).
+ * Mobile: fetch only from CSV app-ads URL (no inventory_partner_domain). Non-.txt paths → origin/app-ads.txt.
  */
 app.post('/api/mobile-compare', uploadCsv.single('csv'), async (req, res) => {
-  if (!req.file?.buffer) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing CSV file. Use multipart field name "csv".',
-    });
+  try {
+    if (!req.file?.buffer) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing CSV file. Use multipart field name "csv".',
+      });
+    }
+    const result = await runMobileUploadCompare(req.file.buffer);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error('api/mobile-compare error:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
-  return res.status(501).json({
-    success: false,
-    error: 'Mobile compare is not implemented yet.',
-  });
 });
 
 /**
  * POST /api/website-compare — multipart field "csv"
- * Placeholder until website compare pipeline is wired (same multipart contract as CTV).
+ * Website: Domain column → fetch ads.txt via http/https + www fallbacks (see websiteInventory).
  */
 app.post('/api/website-compare', uploadCsv.single('csv'), async (req, res) => {
-  if (!req.file?.buffer) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing CSV file. Use multipart field name "csv".',
-    });
+  try {
+    if (!req.file?.buffer) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing CSV file. Use multipart field name "csv".',
+      });
+    }
+    const result = await runWebsiteUploadCompare(req.file.buffer);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error('api/website-compare error:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
-  return res.status(501).json({
-    success: false,
-    error: 'Website compare is not implemented yet.',
-  });
 });
 
 /**
- * POST /api/ctv-export-xlsx — JSON body: { "rows": [ ... same as /api/ctv-compare response rows ] }
- * Returns colored .xlsx (green/red) matching the CTV compare UI. Plain CSV cannot carry colors.
+ * POST /api/ctv-export-xlsx — JSON body: { "rows": [...] } optional "filenamePrefix" (default ctv_compare).
+ * Same row shape as CTV / Mobile / Website compare. Colored .xlsx like the compare UI.
  */
 app.post('/api/ctv-export-xlsx', async (req, res) => {
   try {
@@ -216,7 +232,11 @@ app.post('/api/ctv-export-xlsx', async (req, res) => {
     }
     const buf = await buildCtvCompareXlsxBuffer(rows);
     const stamp = filenameTimestamp();
-    const name = `ctv_compare_${stamp}.xlsx`;
+    let prefix = 'ctv_compare';
+    if (typeof req.body?.filenamePrefix === 'string' && req.body.filenamePrefix.trim()) {
+      prefix = req.body.filenamePrefix.trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48) || prefix;
+    }
+    const name = `${prefix}_${stamp}.xlsx`;
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -245,15 +265,18 @@ async function startLocal() {
     console.log('MongoDB server version:', version);
     console.log('------------------------------\n');
 
-    app.listen(PORT, () => {
-      console.log(`Server listening on http://localhost:${PORT}`);
+    app.listen(PORT, HOST, () => {
+      console.log(`Server listening on http://${HOST}:${PORT}`);
+      if (process.env.PUBLIC_BASE_URL) {
+        console.log(`Public URL: ${process.env.PUBLIC_BASE_URL}`);
+      }
       console.log('POST /process — platform-based extraction');
       console.log('POST /match-adlines — find adlines in app-ads.txt files, write CSV');
       console.log('POST /compare-csv — diff two CSVs by App Bundle');
       console.log(`GET  /ctv-compare — CTV upload UI`);
       console.log('POST /api/ctv-compare — multipart csv, compare vs live fetch');
-      console.log('POST /api/mobile-compare — multipart csv (placeholder)');
-      console.log('POST /api/website-compare — multipart csv (placeholder)');
+      console.log('POST /api/mobile-compare — multipart csv, app-ads URL from CSV only');
+      console.log('POST /api/website-compare — multipart csv, Domain → ads.txt fallbacks');
       console.log('POST /api/ctv-export-xlsx — JSON rows → colored Excel (UI colors)\n');
     });
   } catch (err) {
@@ -262,9 +285,6 @@ async function startLocal() {
   }
 }
 
-/** Vercel runs the app as a serverless function; do not listen or require Mongo at cold start. */
-if (!process.env.VERCEL) {
-  startLocal();
-}
+startLocal();
 
 module.exports = app;

@@ -45,17 +45,22 @@ async function buildCtvCompareXlsxBuffer(rows) {
   }
 
   const refAdlines = referenceAdlines(rows);
+  const websiteStyle = rows.some((r) => Object.prototype.hasOwnProperty.call(r, 'fetchError'));
+  const baseCount = 4;
+
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Helix AdsCodes';
-  const ws = wb.addWorksheet('CTV Compare');
+  const ws = wb.addWorksheet(websiteStyle ? 'Website Compare' : 'CTV Compare');
   ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
 
-  const headerCells = [
-    'App Bundle',
-    'app_ads_txt_url (anshul)',
-    'app_ads_txt_url (abhinav)',
-    'inventory_partner_domain (anshul)',
-  ];
+  const headerCells = websiteStyle
+    ? ['Domain', 'domain (anshul)', 'ads.txt URL (abhinav)', 'error']
+    : [
+        'App Bundle',
+        'app_ads_txt_url (anshul)',
+        'app_ads_txt_url (abhinav)',
+        'inventory_partner_domain (anshul)',
+      ];
   for (const a of refAdlines) {
     const label = (a.adline || a.header || '').trim();
     headerCells.push(`${label}\n(anshul)`, `${label}\n(abhinav)`);
@@ -68,13 +73,22 @@ async function buildCtvCompareXlsxBuffer(rows) {
     cell.alignment = { wrapText: true, vertical: 'top' };
   });
 
+  const adlineStartCol = baseCount + 1;
+
   for (const r of rows) {
-    const values = [
-      r.appBundle ?? '',
-      r.appAdsTxtUrlAnshul ?? '',
-      r.appAdsTxtUrlAbhinav ?? '',
-      r.inventoryPartnerAnshul ?? '',
-    ];
+    const values = websiteStyle
+      ? [
+          r.appBundle ?? '',
+          r.appAdsTxtUrlAnshul ?? '',
+          r.appAdsTxtUrlAbhinav ?? '',
+          r.fetchError ?? '',
+        ]
+      : [
+          r.appBundle ?? '',
+          r.appAdsTxtUrlAnshul ?? '',
+          r.appAdsTxtUrlAbhinav ?? '',
+          r.inventoryPartnerAnshul ?? '',
+        ];
     const ad = r.adlines || [];
     for (let i = 0; i < refAdlines.length; i++) {
       const c = ad[i];
@@ -84,11 +98,11 @@ async function buildCtvCompareXlsxBuffer(rows) {
     const excelRow = ws.addRow(values);
     excelRow.eachCell((cell, colNumber) => {
       cell.alignment = { wrapText: true, vertical: 'top' };
-      if (colNumber <= 4) {
+      if (colNumber <= baseCount) {
         cell.fill = FILL_BASE;
         return;
       }
-      const idx = Math.floor((colNumber - 5) / 2);
+      const idx = Math.floor((colNumber - adlineStartCol) / 2);
       const c = ad[idx];
       if (!c) {
         cell.fill = FILL_BASE;
@@ -99,7 +113,10 @@ async function buildCtvCompareXlsxBuffer(rows) {
   }
 
   ws.columns = headerCells.map((_, i) => ({
-    width: i < 4 ? Math.min(48, 14 + (i === 0 ? 10 : 0)) : 12,
+    width:
+      i < baseCount
+        ? Math.min(52, (websiteStyle && i === 3 ? 36 : 14) + (i === 0 ? 10 : 0))
+        : 12,
   }));
 
   const buf = await wb.xlsx.writeBuffer();
