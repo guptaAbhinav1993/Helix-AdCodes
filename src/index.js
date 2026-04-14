@@ -13,6 +13,12 @@ const { filenameTimestamp } = require('./outputNames');
 
 const app = express();
 app.use(express.json({ limit: '80mb' }));
+
+/** Before static so GET /ctv-compare always hits this handler (not a stale 404 from another layer). */
+app.get('/ctv-compare', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'ctv-compare.html'));
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const uploadCsv = multer({
@@ -25,7 +31,7 @@ const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
 app.get('/', (req, res) => {
-  res.redirect(302, '/ctv-compare.html');
+  res.redirect(302, '/ctv-compare');
 });
 
 /**
@@ -142,10 +148,6 @@ app.get('/compare-csv', (req, res) => {
     output:
       'Default: csv_diff_<a>_vs_<b>_<timestamp>.csv; paired *_anshul / *_abhinav context columns; issue_type: row_only_* | cell_mismatch',
   });
-});
-
-app.get('/ctv-compare', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'ctv-compare.html'));
 });
 
 /**

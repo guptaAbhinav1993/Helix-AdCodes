@@ -9,6 +9,7 @@ const {
 const { filterEnabledAdsdocsForPlatform } = require('./adsdocsPlatform');
 const {
   fetchWebsiteAdsTxtWithFallbacks,
+  fetchUrlContentRobust,
   isWebsiteInventoryRow,
   normalizeWebsiteDomainHost,
 } = require('./websiteInventory');
@@ -164,21 +165,12 @@ async function fetchAppRowAdlinesContent(app, caches) {
 
 /**
  * Fetch URL as text. Returns content string or null on failure.
+ * Uses the same Node+curl + browser-like headers as website ads.txt (rejects 202 captcha shells, not real files).
  */
 async function fetchUrlContent(url) {
   const normalized = normalizeUrl(url);
   if (!normalized) return null;
-  try {
-    const res = await fetch(normalized, {
-      method: 'GET',
-      headers: { Accept: 'text/plain, text/html, */*' },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) return null;
-    return await res.text();
-  } catch {
-    return null;
-  }
+  return fetchUrlContentRobust(normalized);
 }
 
 /**
